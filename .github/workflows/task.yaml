@@ -65,7 +65,7 @@ jobs:
 
       - name: Build and push
         run: |
-          docker build -t thumama/task:${{ needs.prepare.outputs.image_version }} book_shop/book-shop/.
+          docker build -t thumama/task:${{ needs.prepare.outputs.image_version }} .
 
           docker tag thumama/task:${{ needs.prepare.outputs.image_version }} \
           ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
