@@ -7,13 +7,11 @@ on:
       - dev
 
 jobs:
-
   prepare:
     outputs:
       image_version: ${{ steps.set_version.outputs.version }}
     runs-on: ubuntu-latest
     steps:
-
       - name: check out
         uses: actions/checkout@v4
 
@@ -34,7 +32,6 @@ jobs:
         id: set_version
         run: echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-  
   test_version:
     runs-on: ubuntu-latest
     needs: prepare
@@ -55,8 +52,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_USER_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_USER_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.REGION }}
- 
-      
+
       - name: docker login
         run: |
           aws ecr get-login-password --region ${{ secrets.REGION }} \
@@ -75,12 +71,11 @@ jobs:
 
           echo "=====================success========================="
 
-  ec2-ssh-pull-and-run:
+  ec2-ssh-pull-and-deploy:
     runs-on: ubuntu-latest
     needs: [docker_build_and_push, prepare]
     steps:
-        
-      - name: ec2 ssh and pull 
+      - name: ec2 ssh and pull to dev
         if: ${{ github.ref == 'refs/heads/dev' }}
         uses: appleboy/ssh-action@v1
         with:
@@ -97,4 +92,25 @@ jobs:
             docker pull ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}\
             .amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
 
-            docker run --name test -dp 3001:3001 ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+            docker run --name test -dp 4000:4000 ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+
+      - name: ec2 ssh and pull to main
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_IP }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          script: |
+            echo "version is:====> ${{ needs.prepare.outputs.image_version }}"
+            echo "================ssh works===================="
+            aws ecr get-login-password --region ${{ secrets.REGION }} \
+            | sudo kubectl create secret docker-registry ecr-secret \
+            --docker-server=${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com \
+            --docker-username=AWS \
+            --docker-password-stdin
+
+            kubectl apply -f django-app.yaml
+
+            kubectl set image deployment/django-app \
+            django=${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
