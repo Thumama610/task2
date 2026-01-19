@@ -301,10 +301,8 @@
 	            kubectl set image deployment/django-app \
 	            django=${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
 
-<img width="1920" height="1080" alt="Screenshot (152) new" src="https://github.com/user-attachments/assets/def7e2a7-df00-4308-9062-ba2e2c0fd57d" />
 
-
-<img width="1920" height="1080" alt="Screenshot (153) new" src="https://github.com/user-attachments/assets/b49ea102-f6a9-43a2-8057-4c9ba1672bb6" />
-
-<img width="1920" height="1080" alt="Screenshot (154) new" src="https://github.com/user-attachments/assets/bc111396-6b08-49f5-bd1a-11a0ece9c481" />
+<img width="1920" height="919" alt="Screenshot (154) new" src="https://github.com/user-attachments/assets/21839daf-1b5b-4008-ba1b-6cf260e390b9" />
+<img width="1920" height="922" alt="Screenshot (153) new" src="https://github.com/user-attachments/assets/e41e30ca-5acc-446b-9236-c19cdfbbd00e" />
+<img width="1920" height="923" alt="Screenshot (152) new" src="https://github.com/user-attachments/assets/cea0fea9-cba4-4596-83e9-3debe4a44d85" />
 
