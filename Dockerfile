@@ -22,6 +22,6 @@ COPY . /app/
 # 🔹 removed collectstatic step since no static files
 # RUN poetry run python manage.py collectstatic --noinput
 
-EXPOSE 80
+EXPOSE 4000
 
-CMD ["poetry", "run", "gunicorn", "--bind", "0.0.0.0:80", "book_shop.wsgi:application"]
+CMD ["poetry", "run", "gunicorn", "--bind", "0.0.0.0:4000", "book_shop.wsgi:application"]

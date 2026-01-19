@@ -97,4 +97,4 @@ jobs:
             docker pull ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}\
             .amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
 
-            docker run --name test -dp 3001:3001 ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+            docker run --name test -dp 8080:4000 ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
