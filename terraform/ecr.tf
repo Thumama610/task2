@@ -1,0 +1,4 @@
+resource "aws_ecr_repository" "microk8s-ecr-repo" {
+  name                 = "thumama/node-app"
+  image_tag_mutability = "MUTABLE"
+}
