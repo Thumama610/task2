@@ -18,4 +18,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 4000
 
 ENTRYPOINT [ "gunicorn" ]
-CMD ["--bind", "0.0.0.0:4000", "book_shop.wsgi:application"]
+CMD ["--bind", "0.0.0.0:3000", "book_shop.wsgi:application"]
