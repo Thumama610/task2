@@ -363,10 +363,10 @@ This setup provides a clean entry point, improves security by hiding internal ap
 	
 	          echo "=====================success========================="
 
-  ec2-ssh-pull-and-deploy:
-    runs-on: ubuntu-latest
-    needs: [docker_build_and_push, prepare]
-    steps:
+	  ec2-ssh-pull-and-deploy:
+	    runs-on: ubuntu-latest
+	    needs: [docker_build_and_push, prepare]
+	    steps:
     
       - name: ec2 ssh and pull to main
         uses: appleboy/ssh-action@v1
