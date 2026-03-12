@@ -296,15 +296,13 @@ This setup provides a clean entry point, improves security by hiding internal ap
 	ENTRYPOINT [ "gunicorn" ]
 	CMD ["--bind", "0.0.0.0:3000", "book_shop.wsgi:application"]
 
-# pipeline 
-
+# main pipeline
 	name: django app
 
 	on:
 	  push:
 	    branches:
 	      - main
-	      - dev
 	
 	jobs:
 	  prepare:
@@ -316,12 +314,100 @@ This setup provides a clean entry point, improves security by hiding internal ap
 	        uses: actions/checkout@v4
 	
 	      - name: extract version (main)
-	        if: ${{ github.ref == 'refs/heads/main' }}
 	        run: |
 	          echo "VERSION=$(grep 'version' pyproject.toml | grep -Eo '[0-9]+\.[0-9]+([.][0-9]+)*|[0-9]+')" >> "$GITHUB_ENV"
 	
+	      - name: test the env var
+	        run: echo "${{ env.VERSION }}"
+	
+	      - name: set and output the version
+	        id: set_version
+	        run: echo "version=$VERSION" >> $GITHUB_OUTPUT
+	
+	  test_version:
+	    runs-on: ubuntu-latest
+	    needs: prepare
+	    steps:
+	      - name: check for the version
+	        run: echo "version is :${{ needs.prepare.outputs.image_version }}"
+	
+	  docker_build_and_push:
+	    runs-on: ubuntu-latest
+	    needs: prepare
+	    steps:
+	      - name: check out
+	        uses: actions/checkout@v4
+	
+	      - name: Configure AWS Credentials
+	        uses: aws-actions/configure-aws-credentials@v4
+	        with:
+	          aws-access-key-id: ${{ secrets.AWS_USER_ACCESS_KEY }}
+	          aws-secret-access-key: ${{ secrets.AWS_USER_SECRET_ACCESS_KEY }}
+	          aws-region: ${{ secrets.REGION }}
+	
+	      - name: docker login
+	        run: |
+	          aws ecr get-login-password --region ${{ secrets.REGION }} \
+	          | docker login --username AWS --password-stdin \
+	          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com
+	
+	      - name: Build and push
+	        run: |
+	          docker build -t thumama/django-app:${{ needs.prepare.outputs.image_version }} .
+	
+	          docker tag thumama/django-app:${{ needs.prepare.outputs.image_version }} \
+	          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }}
+	
+	          docker push \
+	          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }}
+	
+	          echo "=====================success========================="
+
+  ec2-ssh-pull-and-deploy:
+    runs-on: ubuntu-latest
+    needs: [docker_build_and_push, prepare]
+    steps:
+    
+      - name: ec2 ssh and pull to main
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_IP }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          script: |
+            echo "version is:====> ${{ needs.prepare.outputs.image_version }}"
+            echo "================ssh works===================="
+            aws ecr get-login-password --region ${{ secrets.REGION }} \
+            | sudo kubectl create secret docker-registry ecr-registry-secret \
+            --docker-server=${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com \
+            --docker-username=AWS \
+            --docker-password-stdin
+
+            kubectl apply -f django-app.yaml
+
+            kubectl set image deployment/django-app \
+            django=${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }}
+
+
+# dev pipeline 
+
+	name: django app
+
+	on:
+	  push:
+	    branches:
+	      - dev
+	
+	jobs:
+	  prepare:
+	    outputs:
+	      image_version: ${{ steps.set_version.outputs.version }}
+	    runs-on: ubuntu-latest
+	    steps:
+	      - name: check out
+	        uses: actions/checkout@v4
+	
 	      - name: extract version (dev)
-	        if: ${{ github.ref == 'refs/heads/dev' }}
 	        run: |
 	          echo "VERSION=$(grep 'version' pyproject.toml | cut -d'"' -f2)" >> "$GITHUB_ENV"
 	
@@ -361,13 +447,13 @@ This setup provides a clean entry point, improves security by hiding internal ap
 	
 	      - name: Build and push
 	        run: |
-	          docker build -t thumama/task:${{ needs.prepare.outputs.image_version }} .
+	          docker build -t thumama/django-app:${{ needs.prepare.outputs.image_version }} .
 	
-	          docker tag thumama/task:${{ needs.prepare.outputs.image_version }} \
-	          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+	          docker tag thumama/django-app:${{ needs.prepare.outputs.image_version }} \
+	          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }}
 	
 	          docker push \
-	          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+	          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }}
 	
 	          echo "=====================success========================="
 	
@@ -376,7 +462,6 @@ This setup provides a clean entry point, improves security by hiding internal ap
 	    needs: [docker_build_and_push, prepare]
 	    steps:
 	      - name: ec2 ssh and pull to dev
-	        if: ${{ github.ref == 'refs/heads/dev' }}
 	        uses: appleboy/ssh-action@v1
 	        with:
 	          host: ${{ secrets.EC2_IP }}
@@ -390,30 +475,11 @@ This setup provides a clean entry point, improves security by hiding internal ap
 	            ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com
 	
 	            docker pull ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}\
-	            .amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+	            .amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }}
 	
-	            docker run --name test -dp 4000:4000 ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
-	
-	      - name: ec2 ssh and pull to main
-	        if: ${{ github.ref == 'refs/heads/main' }}
-	        uses: appleboy/ssh-action@v1
-	        with:
-	          host: ${{ secrets.EC2_IP }}
-	          username: ${{ secrets.EC2_USERNAME }}
-	          key: ${{ secrets.EC2_PRIVATE_KEY }}
-	          script: |
-	            echo "version is:====> ${{ needs.prepare.outputs.image_version }}"
-	            echo "================ssh works===================="
-	            aws ecr get-login-password --region ${{ secrets.REGION }} \
-	            | sudo kubectl create secret docker-registry ecr-secret \
-	            --docker-server=${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com \
-	            --docker-username=AWS \
-	            --docker-password-stdin
-	
-	            kubectl apply -f django-app.yaml
-	
-	            kubectl set image deployment/django-app \
-	            django=${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+	            docker run --name django-app -dp 4000:4000 ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }} --bind 0.0.0.0:4000 book_shop.wsgi:application
+
+
 
 
 <img width="1920" height="919" alt="Screenshot (154) new" src="https://github.com/user-attachments/assets/21839daf-1b5b-4008-ba1b-6cf260e390b9" />
