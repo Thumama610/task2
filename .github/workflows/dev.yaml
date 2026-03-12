@@ -54,13 +54,13 @@ jobs:
 
       - name: Build and push
         run: |
-          docker build -t thumama/task:${{ needs.prepare.outputs.image_version }} .
+          docker build -t thumama/django-app:${{ needs.prepare.outputs.image_version }} .
 
-          docker tag thumama/task:${{ needs.prepare.outputs.image_version }} \
-          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+          docker tag thumama/django-app:${{ needs.prepare.outputs.image_version }} \
+          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }}
 
           docker push \
-          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+          ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }}
 
           echo "=====================success========================="
 
@@ -82,6 +82,6 @@ jobs:
             ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com
 
             docker pull ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}\
-            .amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }}
+            .amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }}
 
-            docker run --name test -dp 4000:4000 ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/task:${{ needs.prepare.outputs.image_version }} --bind 0.0.0.0:4000 book_shop.wsgi:application
+            docker run --name django-app -dp 4000:4000 ${{ secrets.AWS_ID }}.dkr.ecr.${{ secrets.REGION }}.amazonaws.com/thumama/django-app:${{ needs.prepare.outputs.image_version }} --bind 0.0.0.0:4000 book_shop.wsgi:application
