@@ -185,105 +185,82 @@ This setup provides a clean entry point, improves security by hiding internal ap
     }
     
     http {
-        include       /etc/nginx/mime.types;
-        default_type  application/octet-stream;
-    
-        log_format main
-          '$remote_addr - $remote_user [$time_local] "$request" '
-          '$status $body_bytes_sent "$http_referer" '
-          '"$http_user_agent" "$http_x_forwarded_for"';
-    
-        access_log /var/log/nginx/access.log main;
-    
-        sendfile        on;
-        keepalive_timeout 65;
-    
-        
-        # Docker run: -p 8080:4000
-    	
-        server {
-            listen 8080;
-            server_name _;
-    
-            location / {
-                proxy_pass http://127.0.0.1:4000;
-                proxy_http_version 1.1;
-    
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
-    
-                proxy_connect_timeout 60s;
-                proxy_read_timeout 60s;
-            }
-        }
-    
-        #Kubernetes NodePort: 32000
-    	
-        server {
-            listen 80;
-            server_name _;
-    
-            location / {
-                proxy_pass http://<EC2_PRIVATE_IP>:32000;
-                proxy_http_version 1.1;
-    
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
-    
-                proxy_connect_timeout 60s;
-                proxy_read_timeout 60s;
-            }
-        }
-    }
+        # server for port 80 -> 3000
+	    server {
+	        listen 80;
+	        server_name _;
+	
+	        location / {
+	            proxy_pass http://10.152.183.168:3000;
+	
+	            proxy_http_version 1.1;
+	            proxy_set_header Upgrade $http_upgrade;
+	            proxy_set_header Connection "upgrade";
+	
+	            proxy_set_header Host $host;
+	            proxy_set_header X-Real-IP $remote_addr;
+	            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+	            proxy_set_header X-Forwarded-Proto $scheme;
+	        }
+	    }
+	
+	    # server for port 8080 -> 4000
+	    server {
+	        listen 8080;
+	        server_name _;
+	
+	        location / {
+	            proxy_pass http://127.0.0.1:4000;
+	
+	            proxy_http_version 1.1;
+	            proxy_set_header Upgrade $http_upgrade;
+	            proxy_set_header Connection "upgrade";
+	
+	            proxy_set_header Host $host;
+	            proxy_set_header X-Real-IP $remote_addr;
+	            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		    proxy_set_header X-Forwarded-Proto $scheme;
+	        }
+	    }
+	
+	}
 
 # k8s resource definition:
 
     apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: django-app
-    spec:
-      replicas: 1
-      selector:
-        matchLabels:
-          app: django
-      template:
-        metadata:
-          labels:
-            app: django
-        spec:
-          imagePullSecrets:
-            - name: ecr-secret
-          containers:
-            - name: django
-              image: AWS_ID.dkr.ecr.us-east-1.amazonaws.com/thumama/task:0.1.0.dev0 # AWS_ID is hidden for security
-              ports:
-                - containerPort: 3000
-              env:
-                - name: DJANGO_SETTINGS_MODULE
-                  value: project.settings
-              command: ["gunicorn"]
-              args:
-                - project.wsgi:application
-                - --bind
-                - 0.0.0.0:3000
-    ---
-    apiVersion: v1
-    kind: Service
-    metadata:
-      name: django-service
-    spec:
-      type: NodePort
-      selector:
-        app: django
-      ports:
-        - port: 3000
-          targetPort: 3000
-          nodePort: 32000
+	kind: Deployment
+	metadata:
+	  name: django-app
+	spec:
+	  replicas: 1
+	  selector:
+	    matchLabels:
+	      app: django
+	  template:
+	    metadata:
+	      labels:
+	        app: django
+	    spec:
+	      imagePullSecrets:
+	        - name: ecr-registry-secret
+	      containers:
+	        - name: django
+	          image: 303846055865.dkr.ecr.us-east-1.amazonaws.com/thumama/node-app:latest
+	          ports:
+	            - containerPort: 3000
+	---
+	apiVersion: v1
+	kind: Service
+	metadata:
+	  name: django-service
+	spec:
+	  type: NodePort
+	  selector:
+	    app: django
+	  ports:
+	    - port: 3000
+	      targetPort: 3000
+	      nodePort: 32000
 
 # aws installation
 
@@ -300,23 +277,24 @@ This setup provides a clean entry point, improves security by hiding internal ap
 	FROM python:3.11-slim
 
 	WORKDIR /app
-
-       # Install gunicorn
+	
+	# Install gunicorn
 	RUN pip install --no-cache-dir gunicorn
-
-       # Copy all files
+	
+	# Copy all files
 	COPY . /app/
-
-       # Install your app
+	
+	# Install your app
 	RUN pip install /app/dist/*.whl*
-
+	
+	
 	ENV PYTHONDONTWRITEBYTECODE=1
 	ENV PYTHONUNBUFFERED=1
-
-	EXPOSE 4000
+	
+	EXPOSE 3000
 	
 	ENTRYPOINT [ "gunicorn" ]
-	CMD ["--bind", "0.0.0.0:4000", "book_shop.wsgi:application"]
+	CMD ["--bind", "0.0.0.0:3000", "book_shop.wsgi:application"]
 
 # pipeline 
 
